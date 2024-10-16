@@ -297,7 +297,15 @@ async def predict_damage(damage:Damage):
 
             combined_result = cv2.addWeighted(damage_result, 0.5, parts_result, 0.5, 0)
 
-            await requests.put(damage.pre_signed_url, data=combined_result)
+            _, buffer = cv2.imencode('.jpg', combined_result)  # Change '.png' to '.jpg' if needed
+            image_bytes = buffer.tobytes()
+
+            # Upload to S3 using the pre-signed URL
+            response = await requests.put(
+                damage.pre_signed_url,
+                data=image_bytes,
+                headers={'Content-Type': 'image/jpeg'}  # Change to 'image/jpeg' if needed
+            )
 
             estimated_cost = estimate_cost_api(high_conf_damage, filtered_parts, parts_metadata)
 
