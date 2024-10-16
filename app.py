@@ -191,7 +191,7 @@ if uploaded_file is not None:
 
 import requests
 from pydantic import BaseModel
-
+from io import BytesIO
 
 class Damage(BaseModel):
     image_url: str
@@ -202,12 +202,16 @@ class Damage(BaseModel):
 def read_root():
     return {"Hello": "World"}
 
+
+def load_image_from_url(url):
+    response = requests.get(url)
+    image = Image.open(BytesIO(response.content)).convert("RGB")
+    image_np = np.array(image)
+    return image_np
+
 @app.post("/api/v1/damage-detection")
 async def predict_damage(damage:Damage):
-    # Download the image
-    image_url = damage.image_url
-    image = Image.open(requests.get(image_url, stream=True).raw).convert("RGB")
-    image_np = np.array(image)
+    image_np = load_image_from_url(damage.image_url)
     high_conf_damage, high_conf_parts = predict(image_np)
 
     if len(high_conf_damage) > 0:
