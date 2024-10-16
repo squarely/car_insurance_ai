@@ -95,7 +95,7 @@ def predict(image_np):
     cfg_damage.MODEL.ROI_HEADS.NUM_CLASSES = 1
     cfg_damage.MODEL.WEIGHTS = "https://my-structure-storage.s3.eu-north-1.amazonaws.com/models/damage_org.pth"
     cfg_damage.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5
-    cfg_damage.MODEL.DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+    cfg_damage.MODEL.DEVICE = 'cpu'
 
     # Damage predictor
     damage_predictor = DefaultPredictor(cfg_damage)
@@ -109,7 +109,7 @@ def predict(image_np):
     cfg_parts.MODEL.ROI_HEADS.NUM_CLASSES = 5
     cfg_parts.MODEL.WEIGHTS = "https://my-structure-storage.s3.eu-north-1.amazonaws.com/models/parts_org.pth"
     cfg_parts.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.75
-    cfg_parts.MODEL.DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+    cfg_parts.MODEL.DEVICE = 'cpu'
 
     # Parts predictor
     parts_predictor = DefaultPredictor(cfg_parts)
