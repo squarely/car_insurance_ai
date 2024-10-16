@@ -3,7 +3,7 @@ import streamlit as st
 from PIL import Image
 import numpy as np
 import cv2
-from fastapi import FastAPI
+from fastapi import FastAPI,HTTPException
 import uvicorn
 from detectron2.engine import DefaultPredictor
 from detectron2.config import get_cfg
@@ -211,41 +211,57 @@ async def load_image_from_url(url):
 
 @app.post("/api/v1/damage-detection")
 async def predict_damage(damage:Damage):
-    image_np = load_image_from_url(damage.image_url)
-    high_conf_damage, high_conf_parts = predict(image_np)
 
-    if len(high_conf_damage) > 0:
-        damage_boxes = high_conf_damage.pred_boxes
-        parts_boxes = high_conf_parts.pred_boxes
+    try:
+        image_np = load_image_from_url(damage.image_url)
+        high_conf_damage, high_conf_parts = predict(image_np)
 
-        iou_matrix = pairwise_ioa(parts_boxes, damage_boxes)
+        if len(high_conf_damage) > 0:
+            damage_boxes = high_conf_damage.pred_boxes
+            parts_boxes = high_conf_parts.pred_boxes
 
-        filtered_indices = []
-        for i in range(iou_matrix.shape[0]):
-            if iou_matrix[i].max() > 0:
-                filtered_indices.append(i)
+            iou_matrix = pairwise_ioa(parts_boxes, damage_boxes)
 
-        filtered_parts = high_conf_parts[filtered_indices]
-    else:
-        filtered_parts = []
+            filtered_indices = []
+            for i in range(iou_matrix.shape[0]):
+                if iou_matrix[i].max() > 0:
+                    filtered_indices.append(i)
 
-    if len(high_conf_damage) > 0:
-        # Visualize and display the results
-        v_damage = Visualizer(image_np[:, :, ::-1], metadata=damage_metadata, instance_mode=ColorMode.IMAGE)
-        v_damage = v_damage.draw_instance_predictions(high_conf_damage)
-        damage_result = v_damage.get_image()[:, :, ::-1]
+            filtered_parts = high_conf_parts[filtered_indices]
+        else:
+            filtered_parts = []
 
-        v_parts = Visualizer(image_np[:, :, ::-1], metadata=parts_metadata, instance_mode=ColorMode.IMAGE)
-        v_parts = v_parts.draw_instance_predictions(filtered_parts)
-        parts_result = v_parts.get_image()[:, :, ::-1]
+        if len(high_conf_damage) > 0:
+            estimated_cost = estimate_cost(high_conf_damage, filtered_parts, parts_metadata)
+            return {"data":estimated_cost}
+        else:
+            return {"data": "No damage detected."}
 
-        combined_result = cv2.addWeighted(damage_result, 0.5, parts_result, 0.5, 0)
+        # if len(high_conf_damage) > 0:
+        #     # Visualize and display the results
+        #     v_damage = Visualizer(image_np[:, :, ::-1], metadata=damage_metadata, instance_mode=ColorMode.IMAGE)
+        #     v_damage = v_damage.draw_instance_predictions(high_conf_damage)
+        #     damage_result = v_damage.get_image()[:, :, ::-1]
 
-        requests.put(damage.pre_signed_url, data=combined_result)
+        #     v_parts = Visualizer(image_np[:, :, ::-1], metadata=parts_metadata, instance_mode=ColorMode.IMAGE)
+        #     v_parts = v_parts.draw_instance_predictions(filtered_parts)
+        #     parts_result = v_parts.get_image()[:, :, ::-1]
 
-        estimated_cost = estimate_cost(high_conf_damage, filtered_parts, parts_metadata)
+        #     combined_result = cv2.addWeighted(damage_result, 0.5, parts_result, 0.5, 0)
 
-    return {"data":estimated_cost}
+        #     requests.put(damage.pre_signed_url, data=combined_result)
+
+        #     estimated_cost = estimate_cost(high_conf_damage, filtered_parts, parts_metadata)
+
+        #     return {"data":estimated_cost}
+        # else:
+        #     return {"data": "No damage detected."}
+
+    except Exception as e:
+        # Return a 500 error with the error message
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 
 
 if __name__ == '__main__':
