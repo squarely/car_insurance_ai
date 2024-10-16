@@ -245,7 +245,7 @@ def estimate_cost_api(damage_instances, parts_instances, parts_metadata):
     if labor_needed:
         total_cost += labor_charge
 
-    return total_cost
+    return total_cost, detected_parts
 
 class Damage(BaseModel):
     image_url: str
@@ -311,15 +311,15 @@ async def predict_damage(damage:Damage):
 
             await  upload_image_to_s3(combined_result, damage.pre_signed_url)
 
-            estimated_cost = estimate_cost_api(high_conf_damage, filtered_parts, parts_metadata)
+            estimated_cost,detected_parts = estimate_cost_api(high_conf_damage, filtered_parts, parts_metadata)
 
             return {"data":{
-                "filtered_parts": filtered_parts,
+                "detected_parts": detected_parts,
                 "estimated_cost": estimated_cost
             }}
         else:
             return {"data":{
-                "filtered_parts": [],
+                "detected_parts": [],
                 "estimated_cost": 0
             }}
 
