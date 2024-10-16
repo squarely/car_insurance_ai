@@ -193,6 +193,60 @@ import requests
 from pydantic import BaseModel
 from io import BytesIO
 
+
+def estimate_cost_api(damage_instances, parts_instances, parts_metadata):
+    damage_cost = 250  # Base cost for damage
+    labor_charge = 250  # Base labor charge for any detection
+    parts_cost = {
+        "headlamp": 1500,
+        "rear_bumper": 2000,
+        "door": 3000,
+        "hood": 2500,
+        "front_bumper": 1800
+    }
+
+    total_cost = 0
+    labor_needed = False
+    detected_parts = []
+    damage_in_parts = [False] * len(damage_instances) 
+
+    # Calculate cost based on detected parts
+    if len(parts_instances) > 0:
+        for i in range(len(parts_instances)):
+            part_class_id = parts_instances.pred_classes[i].item()
+            part_name = parts_metadata.thing_classes[part_class_id]
+            detected_parts.append(part_name)
+            estimated_part_cost = parts_cost.get(part_name, 0)
+            total_cost += estimated_part_cost
+
+            # Set labor flag if any detection occurs
+            labor_needed = True
+
+            for j in range(len(damage_instances)):
+                damage_box = damage_instances.pred_boxes[j].tensor.numpy()
+                part_box = parts_instances.pred_boxes[i].tensor.numpy()
+
+                # Check for intersection
+                if (
+                    damage_box[0][0] < part_box[0][2] and
+                    damage_box[0][2] > part_box[0][0] and
+                    damage_box[0][1] < part_box[0][3] and
+                    damage_box[0][3] > part_box[0][1]
+                ):
+                    damage_in_parts[j] = True 
+
+    if len(damage_instances) > 0:
+        for i in range(len(damage_instances)):
+            if not damage_in_parts[i]:
+                total_cost += damage_cost
+
+                labor_needed = True
+
+    if labor_needed:
+        total_cost += labor_charge
+
+    return total_cost
+
 class Damage(BaseModel):
     image_url: str
     pre_signed_url: str
@@ -232,36 +286,27 @@ async def predict_damage(damage:Damage):
             filtered_parts = []
 
         if len(high_conf_damage) > 0:
-            estimated_cost = estimate_cost(high_conf_damage, filtered_parts, parts_metadata)
+            # Visualize and display the results
+            v_damage = Visualizer(image_np[:, :, ::-1], metadata=damage_metadata, instance_mode=ColorMode.IMAGE)
+            v_damage = v_damage.draw_instance_predictions(high_conf_damage)
+            damage_result = v_damage.get_image()[:, :, ::-1]
+
+            v_parts = Visualizer(image_np[:, :, ::-1], metadata=parts_metadata, instance_mode=ColorMode.IMAGE)
+            v_parts = v_parts.draw_instance_predictions(filtered_parts)
+            parts_result = v_parts.get_image()[:, :, ::-1]
+
+            combined_result = cv2.addWeighted(damage_result, 0.5, parts_result, 0.5, 0)
+
+            await requests.put(damage.pre_signed_url, data=combined_result)
+
+            estimated_cost = estimate_cost_api(high_conf_damage, filtered_parts, parts_metadata)
+
             return {"data":estimated_cost}
         else:
-            return {"data": "No damage detected."}
-
-        # if len(high_conf_damage) > 0:
-        #     # Visualize and display the results
-        #     v_damage = Visualizer(image_np[:, :, ::-1], metadata=damage_metadata, instance_mode=ColorMode.IMAGE)
-        #     v_damage = v_damage.draw_instance_predictions(high_conf_damage)
-        #     damage_result = v_damage.get_image()[:, :, ::-1]
-
-        #     v_parts = Visualizer(image_np[:, :, ::-1], metadata=parts_metadata, instance_mode=ColorMode.IMAGE)
-        #     v_parts = v_parts.draw_instance_predictions(filtered_parts)
-        #     parts_result = v_parts.get_image()[:, :, ::-1]
-
-        #     combined_result = cv2.addWeighted(damage_result, 0.5, parts_result, 0.5, 0)
-
-        #     requests.put(damage.pre_signed_url, data=combined_result)
-
-        #     estimated_cost = estimate_cost(high_conf_damage, filtered_parts, parts_metadata)
-
-        #     return {"data":estimated_cost}
-        # else:
-        #     return {"data": "No damage detected."}
+            return {"data": 0}
 
     except Exception as e:
-        # Return a 500 error with the error message
         raise HTTPException(status_code=500, detail=str(e))
-
-
 
 
 if __name__ == '__main__':
