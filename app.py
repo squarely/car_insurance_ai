@@ -189,8 +189,13 @@ if uploaded_file is not None:
             st.write("No damage detected, skipping parts prediction.")
  
 
-from model import Damage
 import requests
+from pydantic import BaseModel
+
+
+class Damage(BaseModel):
+    image_url: str
+    pre_signed_url: str
 
 # Run the FastAPI app
 @app.get("/")
@@ -237,3 +242,7 @@ async def predict_damage(damage:Damage):
             estimated_cost = estimate_cost(high_conf_damage, filtered_parts, parts_metadata)
 
     return {"data":estimated_cost}
+
+
+if __name__ == '__main__':
+    uvicorn.run(app, host='0.0.0.0', port=8000)
