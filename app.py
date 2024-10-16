@@ -313,9 +313,15 @@ async def predict_damage(damage:Damage):
 
             estimated_cost = estimate_cost_api(high_conf_damage, filtered_parts, parts_metadata)
 
-            return {"data":estimated_cost}
+            return {"data":{
+                "filtered_parts": filtered_parts,
+                "estimated_cost": estimated_cost
+            }}
         else:
-            return {"data": 0}
+            return {"data":{
+                "filtered_parts": [],
+                "estimated_cost": 0
+            }}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
