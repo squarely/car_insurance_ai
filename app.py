@@ -213,7 +213,7 @@ async def load_image_from_url(url):
 async def predict_damage(damage:Damage):
 
     try:
-        image_np = load_image_from_url(damage.image_url)
+        image_np = await load_image_from_url(damage.image_url)
         high_conf_damage, high_conf_parts = predict(image_np)
 
         if len(high_conf_damage) > 0:
