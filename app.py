@@ -203,7 +203,7 @@ def read_root():
     return {"Hello": "World"}
 
 
-def load_image_from_url(url):
+async def load_image_from_url(url):
     response = requests.get(url)
     image = Image.open(BytesIO(response.content)).convert("RGB")
     image_np = np.array(image)
@@ -230,20 +230,20 @@ async def predict_damage(damage:Damage):
         filtered_parts = []
 
     if len(high_conf_damage) > 0:
-            # Visualize and display the results
-            v_damage = Visualizer(image_np[:, :, ::-1], metadata=damage_metadata, instance_mode=ColorMode.IMAGE)
-            v_damage = v_damage.draw_instance_predictions(high_conf_damage)
-            damage_result = v_damage.get_image()[:, :, ::-1]
+        # Visualize and display the results
+        v_damage = Visualizer(image_np[:, :, ::-1], metadata=damage_metadata, instance_mode=ColorMode.IMAGE)
+        v_damage = v_damage.draw_instance_predictions(high_conf_damage)
+        damage_result = v_damage.get_image()[:, :, ::-1]
 
-            v_parts = Visualizer(image_np[:, :, ::-1], metadata=parts_metadata, instance_mode=ColorMode.IMAGE)
-            v_parts = v_parts.draw_instance_predictions(filtered_parts)
-            parts_result = v_parts.get_image()[:, :, ::-1]
+        v_parts = Visualizer(image_np[:, :, ::-1], metadata=parts_metadata, instance_mode=ColorMode.IMAGE)
+        v_parts = v_parts.draw_instance_predictions(filtered_parts)
+        parts_result = v_parts.get_image()[:, :, ::-1]
 
-            combined_result = cv2.addWeighted(damage_result, 0.5, parts_result, 0.5, 0)
+        combined_result = cv2.addWeighted(damage_result, 0.5, parts_result, 0.5, 0)
 
-            requests.put(damage.pre_signed_url, data=combined_result)
+        requests.put(damage.pre_signed_url, data=combined_result)
 
-            estimated_cost = estimate_cost(high_conf_damage, filtered_parts, parts_metadata)
+        estimated_cost = estimate_cost(high_conf_damage, filtered_parts, parts_metadata)
 
     return {"data":estimated_cost}
 
